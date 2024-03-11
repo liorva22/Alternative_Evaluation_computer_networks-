@@ -1,6 +1,5 @@
 import random
 import struct
-
 import socket
 
 
@@ -74,7 +73,7 @@ class TriviaClient:
     #         time.sleep(0.1)
 
     def game_mode(self, tcp_socket):
-        print("Game started. Waiting for the question...")
+        print("I'm in. Waiting for the question...")  # debug
         while True:
             try:
                 tcp_socket.setblocking(True)  # Set the socket to blocking mode to wait for the question

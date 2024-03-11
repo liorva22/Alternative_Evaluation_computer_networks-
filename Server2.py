@@ -68,17 +68,17 @@ class TriviaServer2:
 
             self.send_to_all_clients(welcome_message)
 
-        def check_answers():
-            # Receive answers from clients and validate them
-            correct_answer = str(self.current_question['is_true'])
-            for client, (client_socket, _) in self.clients.items():
-                answer = client_socket.recv(1024).decode().strip()
-                if answer.upper() == correct_answer.upper():
-                    winner_message = f"Congratulations! You are the winner for the question: {question_msg}"
-                    client_socket.sendall(winner_message.encode())
-                    # Other clients can be informed that a winner has been declared
-
-        threading.Timer(10, check_answers).start()
+        # def check_answers():
+        #     # Receive answers from clients and validate them
+        #     correct_answer = str(self.current_question['is_true'])
+        #     for client, (client_socket, _) in self.clients.items():
+        #         answer = client_socket.recv(1024).decode().strip()
+        #         if answer.upper() == correct_answer.upper():
+        #             winner_message = f"Congratulations! You are the winner for the question: {question_msg}"
+        #             client_socket.sendall(winner_message.encode())
+        #             # Other clients can be informed that a winner has been declared
+        #
+        # threading.Timer(10, check_answers).start()
 
     def send_to_all_clients(self, message):
         for client_socket, _ in list(self.clients.values()):  # Use list to copy values for safe iteration
@@ -90,21 +90,28 @@ class TriviaServer2:
 
     def handle_client(self, client_socket, address):
         try:
+            # Receive player name from the client
             player_name = client_socket.recv(1024).decode().strip()
+            # Store client information (socket and name)
             self.clients[address] = (client_socket, player_name)
             print(f"{player_name} connected from {address}")
 
-            # Wait until the game has actually started
+            # Wait for the game to start
             while not self.game_started:
                 time.sleep(0.1)
         except Exception as e:
             print(f"Error handling client {address}: {e}")
         finally:
-            # Clean up after the game has started or in case of an error
+            # Optional: After the game has started, or in case of error, close client socket
+            # Consideration: You might want to keep the socket open for post-game messages or multiple rounds
             client_socket.close()
+            # Remove the client from the list to prevent sending messages to disconnected clients
+            if address in self.clients:
+                del self.clients[address]
 
     def accept_connections(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+            # Bind the server socket to the provided host and port
             server_socket.bind(('0.0.0.0', self.tcp_port))
             server_socket.listen()
             print(f"Server started, listening on IP address {self.server_ip}")
@@ -112,15 +119,18 @@ class TriviaServer2:
             # server_socket.settimeout(10)  # Set a timeout of 10 seconds
 
             # try:
-            client_socket, address = server_socket.accept()
-            threading.Thread(target=self.handle_client, args=(client_socket, address)).start()
+            while True:  # Continuously accept new client connections
+                client_socket, address = server_socket.accept()
+                client_thread = threading.Thread(target=self.handle_client, args=(client_socket, address))
+                client_thread.start()
 
-            if not self.game_started:
-                if hasattr(self, 'start_timer'):
-                    self.start_timer.cancel()
+                if not self.game_started:
+                    if hasattr(self, 'start_timer'):
+                        self.start_timer.cancel()
 
-                self.start_timer = threading.Timer(10, self.start_game)
-                self.start_timer.start()
+                    self.start_timer = threading.Timer(10, self.start_game)
+                    self.start_timer.start()
+
             # except socket.timeout:
             #     print("No client connected within 10 seconds. Shutting down the server.")
             #     # Clean up and shut down the server
